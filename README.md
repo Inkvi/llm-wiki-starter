@@ -51,7 +51,19 @@ cd ~/my-vault
 ./setup
 ```
 
-`setup` does only the mechanical work: it replaces this template's git history with a fresh one, creates the two gitignored folders a clone cannot carry, fetches [kepano's Obsidian agent skills](https://github.com/kepano/obsidian-skills), and makes a baseline commit. It is safe to run twice, and it refuses to touch a git history that is not this template's, so it cannot eat an existing vault.
+`setup` does only the mechanical work: checks the tools the vault needs, replaces this template's git history with a fresh one, creates the two gitignored folders a clone cannot carry, fetches [kepano's Obsidian agent skills](https://github.com/kepano/obsidian-skills), and makes a baseline commit. It is safe to run twice, and it refuses to touch a git history that is not this template's, so it cannot eat an existing vault.
+
+On the tool check, it offers to install anything missing via whichever package manager it finds (Homebrew, apt, dnf, pacman):
+
+| Tool | | Why |
+|---|---|---|
+| `git` | required | The review layer. Every agent edit becomes a diff you can read and revert. |
+| `python3` | required | The three maintenance scripts. 3.8 or newer. |
+| `pdftotext` | recommended | Triaging PDFs: finding which page holds a value, confirming a transcription. Without it every PDF has to be read by the agent's vision on each pass. |
+| `qmd` | later | Local full-text and semantic search. Genuinely not needed yet: index-first navigation is fine until a few hundred sources, so skipping this is the sensible default. |
+| Obsidian | optional | Only the viewer. Nothing breaks without it. |
+
+Nothing is installed without asking, and it tells you before running anything under `sudo`. `--yes` accepts every offer for an unattended run, `--no-install` only reports what is missing. With no terminal to prompt on it declines everything rather than hanging, so piping it somewhere is safe. A missing required tool stops the script before it touches the vault.
 
 Dropping the template's `origin` matters more than it looks. Left in place, one absent-minded `git push` would send your private notes to a public repo. You end up with no remote at all, which is the right default: the git history here is a local review layer, not a backup. Add a **private** remote later if you want one.
 

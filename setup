@@ -1,31 +1,195 @@
 #!/usr/bin/env bash
 # One-time bootstrap for a vault cloned from llm-wiki-starter.
 #
-# Does only the mechanical work: detach from the template's git history, create
-# the two gitignored folders a clone cannot carry, fetch the Obsidian agent
-# skills, and make a baseline commit. Everything requiring a decision is left to
-# the vault-setup skill, so that the agent writes the schema it is going to read.
+# Does only the mechanical work: check and optionally install the tools the vault
+# needs, detach from the template's git history, create the two gitignored
+# folders a clone cannot carry, fetch the Obsidian agent skills, and make a
+# baseline commit. Everything requiring a decision about *your life* is left to
+# the vault-setup skill, so the agent writes the schema it is going to read.
 #
 # Safe to run twice. Refuses to touch a git history that is not the template's.
+# Never installs anything without asking, and never runs sudo without telling you.
+#
+# Usage: ./setup [--yes] [--no-install] [--help]
 
 set -euo pipefail
 
 TEMPLATE_SLUG="llm-wiki-starter"
+ASSUME_YES=0
+NO_INSTALL=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --yes|-y)    ASSUME_YES=1 ;;
+    --no-install) NO_INSTALL=1 ;;
+    --help|-h)
+      sed -n '2,14p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0 ;;
+    *) printf 'unknown option: %s (try --help)\n' "$1" >&2; exit 2 ;;
+  esac
+  shift
+done
+
 say()  { printf '%s\n' "$*"; }
-ok()   { printf '  ok    %s\n' "$*"; }
-skip() { printf '  skip  %s\n' "$*"; }
+ok()   { printf '  ok      %s\n' "$*"; }
+skip() { printf '  skip    %s\n' "$*"; }
+warn() { printf '  missing %s\n' "$*"; }
+note() { printf '          %s\n' "$*"; }
 die()  { printf '\nstopped: %s\n' "$*" >&2; exit 1; }
 
 cd "$(dirname "$0")"
 
+# --- 0. where are we, and what installs software here? -----------------------
+
+[ -f CLAUDE.md ] && [ -d "20 Wiki" ] || die "this does not look like a vault root (no CLAUDE.md and 20 Wiki/ here)"
+
+PKG=""
+PKG_SUDO=""
+if   command -v brew    >/dev/null 2>&1; then PKG="brew"
+elif command -v apt-get >/dev/null 2>&1; then PKG="apt";    PKG_SUDO="sudo"
+elif command -v dnf     >/dev/null 2>&1; then PKG="dnf";    PKG_SUDO="sudo"
+elif command -v pacman  >/dev/null 2>&1; then PKG="pacman"; PKG_SUDO="sudo"
+fi
+
 say "Setting up vault in $(pwd)"
+[ -n "$PKG" ] && say "Package manager: $PKG" || say "Package manager: none detected, will print install commands instead"
 say ""
 
-# --- 1. sanity ---------------------------------------------------------------
-[ -f CLAUDE.md ] && [ -d "20 Wiki" ] || die "this does not look like a vault root (no CLAUDE.md and 20 Wiki/ here)"
-command -v git >/dev/null 2>&1 || die "git is required and was not found on PATH"
-command -v python3 >/dev/null 2>&1 || die "python3 is required by the maintenance scripts and was not found on PATH"
-ok "git and python3 present"
+# Ask a yes/no question. Declines automatically when there is no terminal to ask
+# on, so piping this script into a shell never hangs waiting for input.
+ask() {
+  [ "$ASSUME_YES" = "1" ] && return 0
+  [ -t 0 ] || return 1
+  printf '          install it now? [y/N] '
+  read -r reply || return 1
+  # Strip a trailing carriage return: ptys and Windows shells deliver "y\r",
+  # which silently fails an exact match and reads to the user as being ignored.
+  reply="${reply%$'\r'}"
+  case "$reply" in [yY]|[yY][eE][sS]) return 0 ;; *) return 1 ;; esac
+}
+
+# Print the command that would install $1, for the detected package manager.
+install_cmd() {
+  case "$PKG" in
+    brew)   printf 'brew install %s' "$1" ;;
+    apt)    printf 'sudo apt-get install -y %s' "$1" ;;
+    dnf)    printf 'sudo dnf install -y %s' "$1" ;;
+    pacman) printf 'sudo pacman -S --noconfirm %s' "$1" ;;
+    *)      printf '' ;;
+  esac
+}
+
+run_install() {
+  local pkgname="$1" cmd
+  cmd="$(install_cmd "$pkgname")"
+  [ -n "$cmd" ] || return 1
+  [ -n "$PKG_SUDO" ] && note "this needs sudo: $cmd"
+  # shellcheck disable=SC2086
+  eval "$cmd"
+}
+
+# need <command> <package> <required|recommended> <why>
+need() {
+  local cmd="$1" pkgname="$2" level="$3" why="$4"
+  if command -v "$cmd" >/dev/null 2>&1; then
+    ok "$cmd"
+    return 0
+  fi
+
+  warn "$cmd  ($level)"
+  note "$why"
+
+  local hint
+  hint="$(install_cmd "$pkgname")"
+
+  if [ "$NO_INSTALL" = "1" ] || [ -z "$hint" ]; then
+    [ -n "$hint" ] && note "install with: $hint" || note "no package manager detected; install it yourself (package is usually called \"$pkgname\")"
+  elif ask; then
+    if run_install "$pkgname" && command -v "$cmd" >/dev/null 2>&1; then
+      ok "$cmd installed"
+      return 0
+    fi
+    note "installation did not succeed; try manually: $hint"
+  else
+    note "skipped. install later with: $hint"
+  fi
+
+  if [ "$level" = "required" ]; then
+    die "$cmd is required and is not available. Install it and run ./setup again."
+  fi
+  return 1
+}
+
+# --- 1. prerequisites --------------------------------------------------------
+
+say "Checking tools"
+
+need git git required \
+  "the vault is a git repo; git is what makes every agent edit a reviewable diff"
+
+need python3 python3 required \
+  "the three maintenance scripts are plain Python 3 and are run on every lint pass"
+
+# python3 exists but may be too old for the scripts.
+if command -v python3 >/dev/null 2>&1; then
+  if ! python3 -c 'import sys; raise SystemExit(0 if sys.version_info >= (3,8) else 1)' 2>/dev/null; then
+    warn "python3 is older than 3.8"
+    note "the maintenance scripts may not run; upgrading is recommended"
+  fi
+fi
+
+need pdftotext poppler recommended \
+  "used to triage PDFs: find which page holds a value, or confirm a transcription" \
+  || note "without it, PDFs must be read by the agent's vision on every pass"
+
+say ""
+
+# qmd is deliberately handled separately: it is genuinely not needed yet on a
+# brand-new vault, and installing it via npm has its own prerequisite.
+if command -v qmd >/dev/null 2>&1; then
+  ok "qmd  (full-text and semantic vault search)"
+elif [ "$NO_INSTALL" = "1" ]; then
+  skip "qmd not installed; index-first navigation is fine until a few hundred sources"
+elif command -v npm >/dev/null 2>&1; then
+  warn "qmd  (optional, and not needed yet)"
+  note "qmd adds local full-text and semantic search. Index-first navigation in"
+  note "index.md is fine until roughly a few hundred sources, so it is genuinely"
+  note "reasonable to skip this and add it the day search starts feeling slow."
+  if ask; then
+    npm config set prefix ~/.npm-global >/dev/null 2>&1 || true
+    if npm install -g @tobilu/qmd >/dev/null 2>&1 && command -v qmd >/dev/null 2>&1; then
+      qmd collection add "$(pwd)" --name vault >/dev/null 2>&1 \
+        && ok "qmd installed and this vault indexed as collection 'vault'" \
+        || ok "qmd installed (index it later with: qmd collection add \"\$(pwd)\" --name vault)"
+    else
+      note "install did not succeed. If ~/.npm-global/bin is not on your PATH, add it."
+      note "manual: npm install -g @tobilu/qmd"
+    fi
+  else
+    note "skipped. later: npm install -g @tobilu/qmd && qmd collection add \"\$(pwd)\" --name vault"
+  fi
+else
+  skip "qmd needs Node/npm, which is not installed; skipping (not needed yet anyway)"
+fi
+
+# Obsidian is a GUI app and only the viewer, so it is never worth blocking on.
+if [ -d "/Applications/Obsidian.app" ] || command -v obsidian >/dev/null 2>&1; then
+  ok "Obsidian"
+elif [ "$PKG" = "brew" ] && [ "$NO_INSTALL" != "1" ]; then
+  warn "Obsidian  (optional)"
+  note "only the viewer and editor: nothing breaks without it, but wikilinks,"
+  note "graph view and dashboard.base stop working. Needs 1.9+ for Bases."
+  if ask; then
+    brew install --cask obsidian && ok "Obsidian installed" || note "manual: brew install --cask obsidian"
+  else
+    note "skipped. later: brew install --cask obsidian"
+  fi
+else
+  skip "Obsidian not detected (optional; get it at https://obsidian.md)"
+fi
+
+say ""
+say "Setting up the vault"
 
 # --- 2. detach from the template --------------------------------------------
 # A clone keeps the template as origin. Left in place, a stray 'git push' would
