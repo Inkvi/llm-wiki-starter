@@ -1,3 +1,5 @@
+<!-- vault-setup: pending -->
+
 # Vault Schema (LLM Wiki + Second Brain)
 
 This vault is my second brain, operated by LLM agents following Andrej Karpathy's LLM Wiki pattern. I curate sources and ask questions; the LLM does all filing, summarizing, cross-referencing, and maintenance.
@@ -15,7 +17,11 @@ CLAUDE.md        This schema. Co-evolved with me over time.
 
 ## Layer rules
 
-**10 Sources/ is immutable.** Never edit, rename, or delete anything inside it (exception: filing a new note from Inbox into the right area subfolder). Notes imported from other tools often reference sibling `_resources/` folders via relative links, so notes must stay next to their `_resources` folder. Personal sources are grouped by life area: Health, Finance, Career, Personal, Home & Car, Travel, Projects, Misc.
+**10 Sources/ is immutable.** Never edit, rename, or delete anything inside it (exception: filing a new note from Inbox into the right area subfolder). Notes imported from other tools often reference sibling `_resources/` folders via relative links, so notes must stay next to their `_resources` folder.
+
+<!-- setup:areas:start -->
+Personal sources are grouped by life area: Health, Finance, Career, Personal, Home & Car, Travel, Projects, Misc. These are placeholder defaults; `/vault-setup` replaces them with the areas you actually keep documents for.
+<!-- setup:areas:end -->
 
 **Clippings are not personal life-area sources.** A clipping is any captured external item: detect it by `tags: clippings` and/or a `source:` URL (YouTube, articles, podcasts) in the frontmatter. These represent ideas I found interesting, not documents about my own life, so the life-area folders are the wrong frame for them. File every clipping under `10 Sources/Clippings/<Theme>/`, where `<Theme>` is the intellectual subject (e.g. `Architecture`, `Linguistics`, `Climate`, `Music Theory`, `Urbanism`). Reuse an existing theme folder when one fits; create a new one when none does. **Never file a clipping in Misc**: Misc is for genuinely personal odds-and-ends, not external knowledge. If you truly cannot theme a clipping, leave it in Inbox and flag it in the summary rather than dumping it in Misc.
 
@@ -40,6 +46,8 @@ CLAUDE.md        This schema. Co-evolved with me over time.
 - Dates in ISO format. Sources may span decades; flag stale facts rather than presenting them as current.
 
 ## Tooling: read this before running an operation
+
+**New vault?** `.claude/skills/vault-setup/SKILL.md` runs once, before the first ingest: it interviews you and writes your areas and sensitive-content decision into this file. Under Claude Code it is `/vault-setup`.
 
 **`.claude/skills/vault-maintenance/SKILL.md` is how the operations below get executed.** It holds the procedure, the judgement calls, and three scripts. **Read it before starting any ingest, lint, or maintenance pass**, whichever agent or harness you are. Claude Code loads it as a skill; under Codex or anything else you open the file directly. It is worth reading even for a single-item ingest, because the two steps that catch real errors (hash the Inbox before reading anything; reconcile a new primary source against what the wiki already claims) are easy to skip and have each caught mistakes that survived several passes without them.
 
@@ -100,6 +108,8 @@ The vault is a git repo (markdown only; `.obsidian/`, binaries, and `_resources/
 
 ## Sensitive content
 
-**Decide what is in scope and write it here.** A vault of personal documents will contain some mix of diary entries, health records, financial statements and identity documents, and an agent needs to know which of those it may synthesize into wiki pages. State your decision explicitly, because otherwise the agent will either stop and ask every time or quietly guess.
+<!-- setup:sensitive:start -->
+**Not yet decided.** A vault of personal documents will contain some mix of diary entries, health records, financial statements and identity documents, and an agent needs to know which of those it may synthesize into wiki pages. `/vault-setup` asks this question against your actual documents and records the answer here. Until it does, treat anything sensitive as file-but-do-not-synthesize and say so in your summary.
 
-Whatever you include, one rule is not negotiable: never copy raw ID numbers, account numbers or credentials into a wiki page. Synthesize the fact that a document exists and what it establishes, and link to the source for the number itself.
+One rule holds regardless of that decision: never copy raw ID numbers, account numbers or credentials into a wiki page. Synthesize what a document establishes, and link to the source for the number itself.
+<!-- setup:sensitive:end -->

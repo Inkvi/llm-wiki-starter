@@ -20,6 +20,7 @@ Everything else in this kit follows from that split.
 ## What you get
 
 ```
+setup                      One-time bootstrap script. Run it first.
 CLAUDE.md                  The schema. The behavioural contract for every agent session.
 AGENTS.md                  Symlink to CLAUDE.md, so Codex and others load the same contract.
 .gitignore                 Markdown tracked, binaries ignored. Keeps the vault a readable diff.
@@ -27,6 +28,8 @@ AGENTS.md                  Symlink to CLAUDE.md, so Codex and others load the sa
 10 Sources/                Immutable raw material, grouped by life area, plus Clippings/.
 20 Wiki/                   Areas, Projects, People, Topics, Deliverables, index.md, log.md
 20 Wiki/dashboard.base     Obsidian Bases dashboard: stale pages, active projects, people.
+.claude/skills/vault-setup/
+    SKILL.md               One-time onboarding: interviews you, writes your schema.
 .claude/skills/vault-maintenance/
     SKILL.md               How to run an ingest or lint pass well, and the traps.
     references/            Four invented worked examples, one per failure pattern.
@@ -38,45 +41,45 @@ AGENTS.md                  Symlink to CLAUDE.md, so Codex and others load the sa
 
 ## Setup
 
-Takes about ten minutes.
+Two steps, about five minutes.
 
-**1. Copy the kit into your own folder and start a fresh git history.**
+**1. Clone it and run the bootstrap.**
 
 ```bash
 git clone --depth 1 https://github.com/Inkvi/llm-wiki-starter ~/my-vault
 cd ~/my-vault
-rm -rf .git                  # drop this template's history AND its remote
-mkdir -p "00 Inbox" Attachments   # both gitignored, so a clone lacks them
-git init && git add -A && git commit -m "setup: vault from llm-wiki-starter"
+./setup
 ```
 
-**Do not skip `rm -rf .git`.** Without it your vault keeps this template as its `origin`, and one absent-minded `git push` would send your private notes to a public repo. Deleting it leaves you with no remote at all, which is the right default: the git history here is a local review layer, not a backup. If you do want an off-machine copy later, add a **private** remote deliberately.
+`setup` does only the mechanical work: it replaces this template's git history with a fresh one, creates the two gitignored folders a clone cannot carry, fetches [kepano's Obsidian agent skills](https://github.com/kepano/obsidian-skills), and makes a baseline commit. It is safe to run twice, and it refuses to touch a git history that is not this template's, so it cannot eat an existing vault.
 
-Git itself is not optional. It is what makes every agent edit a diff you can read and revert, and it is the most common piece of advice from people running this pattern.
+Dropping the template's `origin` matters more than it looks. Left in place, one absent-minded `git push` would send your private notes to a public repo. You end up with no remote at all, which is the right default: the git history here is a local review layer, not a backup. Add a **private** remote later if you want one.
 
-**2. Open the folder as an Obsidian vault.** Obsidian is only a viewer and editor here, so nothing breaks if you skip it, but wikilinks, graph view, and `dashboard.base` all stop working. `dashboard.base` needs Obsidian 1.9 or later (Bases is a core plugin).
+**2. Put a few documents in `00 Inbox/`, then let an agent finish the setup.**
 
-**3. Install kepano's Obsidian skills** so agents write correct Obsidian markdown and `.base` files:
-
-```bash
-git clone --depth 1 https://github.com/kepano/obsidian-skills /tmp/obsidian-skills
-cp -R /tmp/obsidian-skills/skills/* .claude/skills/
-```
-
-These teach the agent Obsidian-flavoured markdown, Bases syntax, JSON Canvas, the Obsidian CLI, and Defuddle. They are written by Obsidian's CEO and are MIT licensed.
-
-**4. Personalise `CLAUDE.md`.** It ships written in the first person and deliberately generic. Two things to change:
-
-- The life-area folders under `10 Sources/`. The defaults are Career, Finance, Health, Personal, Home & Car, Travel, Projects, Misc. Use your own.
-- The **Sensitive content** section at the bottom. It ships as a prompt rather than an answer: it asks you to decide which categories of personal document an agent may synthesize into wiki pages, and to write that decision down. Do it before your first ingest, because otherwise the agent will either stop and ask every time or quietly guess.
-
-**5. Run your first ingest.** Drop a few documents in `00 Inbox/` and tell the agent:
+Open the folder in Claude Code and run:
 
 ```
-Read CLAUDE.md, then ingest my inbox.
+/vault-setup
 ```
 
-That is the whole interface. The schema and the skill do the rest.
+Under Codex or another harness, say instead: `read .claude/skills/vault-setup/SKILL.md and follow it`.
+
+The step that cannot be scripted is deciding what this vault is *about*: which life areas you file under, and whether an agent may synthesize your medical records and ID scans into wiki pages or should only cite them. `vault-setup` reads whatever is in your inbox, proposes areas based on what it actually finds, asks you to confirm or edit, then writes the result into `CLAUDE.md`, creates the matching folders, and commits.
+
+That is why the documents come first. Confirming "Health, Home, Finance, based on these five files" takes seconds; inventing a folder taxonomy from a blank page does not, and tends to produce areas that never get used.
+
+It stops there deliberately, without ingesting, so your first ingest is its own reviewable diff.
+
+**3. Ingest.**
+
+```
+ingest my inbox
+```
+
+That is the whole interface from here on. The schema and the maintenance skill carry the rest.
+
+**Obsidian is optional.** It is only the viewer and editor, so nothing breaks without it, but wikilinks, graph view, and `dashboard.base` stop working. `dashboard.base` needs Obsidian 1.9 or later, where Bases is a core plugin.
 
 ## The daily loop
 

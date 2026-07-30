@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# One-time bootstrap for a vault cloned from llm-wiki-starter.
+#
+# Does only the mechanical work: detach from the template's git history, create
+# the two gitignored folders a clone cannot carry, fetch the Obsidian agent
+# skills, and make a baseline commit. Everything requiring a decision is left to
+# the vault-setup skill, so that the agent writes the schema it is going to read.
+#
+# Safe to run twice. Refuses to touch a git history that is not the template's.
+
+set -euo pipefail
+
+TEMPLATE_SLUG="llm-wiki-starter"
+say()  { printf '%s\n' "$*"; }
+ok()   { printf '  ok    %s\n' "$*"; }
+skip() { printf '  skip  %s\n' "$*"; }
+die()  { printf '\nstopped: %s\n' "$*" >&2; exit 1; }
+
+cd "$(dirname "$0")"
+
+say "Setting up vault in $(pwd)"
+say ""
+
+# --- 1. sanity ---------------------------------------------------------------
+[ -f CLAUDE.md ] && [ -d "20 Wiki" ] || die "this does not look like a vault root (no CLAUDE.md and 20 Wiki/ here)"
+command -v git >/dev/null 2>&1 || die "git is required and was not found on PATH"
+command -v python3 >/dev/null 2>&1 || die "python3 is required by the maintenance scripts and was not found on PATH"
+ok "git and python3 present"
+
+# --- 2. detach from the template --------------------------------------------
+# A clone keeps the template as origin. Left in place, a stray 'git push' would
+# send private notes to a public repo, so the history is replaced rather than
+# reused. Only ever removed when origin really is the template.
+if [ -e .git ]; then
+  origin="$(git remote get-url origin 2>/dev/null || true)"
+  if [ -z "$origin" ]; then
+    skip "existing git history has no origin, leaving it alone"
+  elif printf '%s' "$origin" | grep -q "$TEMPLATE_SLUG"; then
+    rm -rf .git
+    ok "removed the template's git history and remote"
+  else
+    die "origin is $origin, which is not the template.
+         This looks like your own repo, so nothing was changed.
+         If you really want a fresh history here, remove .git yourself first."
+  fi
+else
+  skip "no git history to detach"
+fi
+
+# --- 3. folders a clone cannot carry ----------------------------------------
+# Both are gitignored on purpose: the Inbox is staging, not a record, and
+# Attachments holds binaries. Neither survives a clone, so create them.
+for d in "00 Inbox" "Attachments"; do
+  if [ -d "$d" ]; then skip "$d/ exists"; else mkdir -p "$d"; ok "created $d/"; fi
+done
+
+# --- 4. Obsidian agent skills (optional) ------------------------------------
+# kepano/obsidian-skills teaches an agent Obsidian-flavoured markdown, Bases
+# syntax, JSON Canvas, the CLI, and Defuddle. Nice to have, not required.
+if [ -d ".claude/skills/obsidian-markdown" ]; then
+  skip "Obsidian agent skills already installed"
+elif git ls-remote --exit-code https://github.com/kepano/obsidian-skills >/dev/null 2>&1; then
+  tmp="$(mktemp -d)"
+  if git clone --depth 1 --quiet https://github.com/kepano/obsidian-skills "$tmp/os" 2>/dev/null \
+     && [ -d "$tmp/os/skills" ]; then
+    cp -R "$tmp/os/skills/." .claude/skills/
+    ok "installed Obsidian agent skills from kepano/obsidian-skills"
+  else
+    skip "could not fetch Obsidian agent skills, continuing without them"
+  fi
+  rm -rf "$tmp"
+else
+  skip "no network for Obsidian agent skills, continuing without them"
+fi
+
+# --- 5. baseline commit -----------------------------------------------------
+# Committing now means the vault-setup skill's changes land as their own diff,
+# so you can see exactly what onboarding decided on your behalf.
+if [ -e .git ]; then
+  skip "git already initialised"
+else
+  git init --quiet
+  git add -A
+  if git -c user.name="vault" -c user.email="vault@localhost" \
+       commit --quiet -m "setup: vault from llm-wiki-starter" 2>/dev/null; then
+    ok "git initialised with a baseline commit"
+  else
+    skip "git initialised, but the baseline commit failed (set user.name and user.email, then commit)"
+  fi
+fi
+
+# --- next ------------------------------------------------------------------
+say ""
+say "Done. One step left, and it needs an agent rather than a script."
+say ""
+say "  1. Optional but recommended: drop a few real documents into '00 Inbox/'."
+say "     The onboarding skill reads them to propose your life areas, which"
+say "     beats inventing a folder taxonomy from a blank page."
+say ""
+say "  2. Open this folder in Claude Code and run:   /vault-setup"
+say "     Under Codex or another harness, say instead:"
+say "       read .claude/skills/vault-setup/SKILL.md and follow it"
+say ""
+say "It will interview you briefly, write your schema into CLAUDE.md, create"
+say "your area folders, and commit. Then you are ready to ingest."
