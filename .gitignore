@@ -1,0 +1,32 @@
+# Obsidian's own state. Workspace layout churns constantly and is not content.
+.obsidian/
+.DS_Store
+.trash/
+
+# Binaries. Sources are immutable, so the repo only needs to track the markdown
+# that points at them. This keeps the vault a reviewable text diff.
+_resources/
+Attachments/
+*.pdf
+*.apkg
+*.jpg
+*.JPG
+*.jpeg
+*.png
+*.gif
+*.doc
+*.docx
+*.xls
+*.xlsx
+
+# The Inbox is a staging area, not a record. Ingest empties it.
+00 Inbox/
+
+# Scratch and prepared deliverables (kept on disk, out of the repo).
+# Root-anchored so a folder named "output"/"tmp" inside Sources is unaffected.
+/output/
+/tmp/
+
+# Python bytecode from the skill scripts
+__pycache__/
+*.pyc

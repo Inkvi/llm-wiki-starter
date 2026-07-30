@@ -1,0 +1,68 @@
+filters:
+  and:
+    - file.inFolder("20 Wiki")
+    - 'file.ext == "md"'
+    - 'file.name != "index"'
+    - 'file.name != "log"'
+
+formulas:
+  days_stale: 'if(updated, (today() - date(updated)).days, "")'
+  freshness: 'if(updated, if((today() - date(updated)).days > 90, "🔴 stale", if((today() - date(updated)).days > 30, "🟡 aging", "🟢 fresh")), "❓ no date")'
+
+properties:
+  note.type:
+    displayName: "Type"
+  note.status:
+    displayName: "Status"
+  note.updated:
+    displayName: "Updated"
+  formula.days_stale:
+    displayName: "Days stale"
+  formula.freshness:
+    displayName: "Freshness"
+
+views:
+  - type: table
+    name: "All wiki pages"
+    groupBy:
+      property: note.type
+      direction: ASC
+    order:
+      - file.name
+      - note.status
+      - note.updated
+      - formula.freshness
+
+  - type: table
+    name: "Active projects"
+    filters:
+      and:
+        - 'type == "project"'
+        - 'status == "active"'
+    order:
+      - file.name
+      - note.updated
+      - formula.days_stale
+
+  - type: table
+    name: "Needs attention"
+    filters:
+      or:
+        - 'status == "stale"'
+        - 'status == "contradicted"'
+        - 'formula.days_stale > 90'
+    order:
+      - file.name
+      - note.type
+      - note.status
+      - note.updated
+      - formula.days_stale
+
+  - type: cards
+    name: "People"
+    filters:
+      and:
+        - 'type == "person"'
+    order:
+      - file.name
+      - note.updated
