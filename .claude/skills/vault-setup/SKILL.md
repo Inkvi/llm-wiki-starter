@@ -71,11 +71,33 @@ Write the sensitive-content span as a **decision already made**, in their voice,
 
 Then flip the status marker at the top of the file to `<!-- vault-setup: configured YYYY-MM-DD -->` using today's date.
 
-If they chose areas that differ from the shipped defaults, also fix the two other places that name areas: the `10 Sources/` line in the Layout block, and the life-area list in the Layer rules paragraph if it is outside the marked span.
+Then check nothing else still names the old defaults:
+
+```bash
+grep -n "Home & Car\|Travel, Projects\|Health, Finance, Career" CLAUDE.md
+```
+
+As shipped, the only occurrence is inside the areas span, so replacing that span is enough. Run the grep anyway, because the schema is meant to be edited and a later version may name areas elsewhere.
 
 ## 5. Make the folders match
 
 Create a subfolder of `10 Sources/` for each chosen area, and **remove the shipped defaults they did not choose**. Empty unchosen folders are not harmless: they are filing targets, so a later session will eventually put something in `Travel/` for a vault whose owner does not travel, and the taxonomy quietly stops meaning anything.
+
+Each shipped area folder contains a `.gitkeep`, so it is **not** empty and a plain `rmdir` fails. Worse, it fails quietly inside a loop, and you will report areas as removed when they are all still there. Check for real content, then remove the directory outright:
+
+```bash
+cd "10 Sources"
+for d in "Home & Car" Career Travel Projects; do          # the ones NOT chosen
+  [ -d "$d" ] || continue
+  real=$(find "$d" -type f ! -name '.gitkeep' | wc -l | tr -d ' ')
+  if [ "$real" = "0" ]; then rm -rf "$d"; echo "removed $d"
+  else echo "KEPT $d, has $real real file(s)"; fi
+done
+```
+
+The guard matters on a re-run or a vault someone has already started filing: never delete an area that has real documents in it, even if they now say they do not want it. Report it instead and let them move the files.
+
+Verify against what they actually asked for, since a silent failure here is invisible until much later:
 
 ```bash
 ls "10 Sources/"
