@@ -23,6 +23,8 @@ Everything else in this kit follows from that split.
 setup                      One-time bootstrap script. Run it first.
 CLAUDE.md                  The schema. The behavioural contract for every agent session.
 AGENTS.md                  Symlink to CLAUDE.md, so Codex and others load the same contract.
+.claude/skills/            The two skills: vault-setup (onboarding) and vault-maintenance.
+.agents/skills/            The same two, symlinked, so Codex discovers them too.
 .gitignore                 Markdown tracked, binaries ignored. Keeps the vault a readable diff.
 00 Inbox/                  Staging. Ingest empties it.
 10 Sources/                Immutable raw material, grouped by life area, plus Clippings/.
@@ -69,13 +71,13 @@ Dropping the template's `origin` matters more than it looks. Left in place, one 
 
 **2. Put a few documents in `00 Inbox/`, then let an agent finish the setup.**
 
-Open the folder in Claude Code and run:
+Open the folder in your agent and ask for the `vault-setup` skill:
 
-```
-/vault-setup
-```
+- Claude Code: `/vault-setup`
+- Codex: `use the vault-setup skill`
+- Anything else: `read .claude/skills/vault-setup/SKILL.md and follow it`
 
-Under Codex or another harness, say instead: `read .claude/skills/vault-setup/SKILL.md and follow it`.
+Both skills are registered for both harnesses out of the box, so neither one needs to be told where they live.
 
 The step that cannot be scripted is deciding what this vault is *about*: which life areas you file under, and whether an agent may synthesize your medical records and ID scans into wiki pages or should only cite them. `vault-setup` reads whatever is in your inbox, proposes areas based on what it actually finds, asks you to confirm or edit, then writes the result into `CLAUDE.md`, creates the matching folders, and commits.
 

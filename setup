@@ -237,7 +237,33 @@ else
   skip "no network for Obsidian agent skills, continuing without them"
 fi
 
-# --- 5. baseline commit -----------------------------------------------------
+# --- 5. harness compatibility links -----------------------------------------
+# Claude Code discovers skills in .claude/skills, Codex in .agents/skills. The
+# repo ships one copy of each skill under .claude/ and symlinks it into .agents/
+# so both harnesses see the same file. git on Windows does not always create
+# symlinks on checkout, which would silently leave Codex with no skills, so
+# recreate anything that did not survive the clone.
+if [ -d ".claude/skills" ]; then
+  for name in vault-setup vault-maintenance; do
+    [ -d ".claude/skills/$name" ] || continue
+    link=".agents/skills/$name"
+    if [ -L "$link" ] && [ -d "$link" ]; then
+      skip "$link"
+    else
+      mkdir -p .agents/skills
+      rm -rf "$link"
+      ln -s "../../.claude/skills/$name" "$link" && ok "linked $link for Codex"
+    fi
+  done
+fi
+
+# Same problem, same fix: AGENTS.md is a symlink to CLAUDE.md so both harnesses
+# load one schema. A Windows checkout can leave it as a file containing a path.
+if [ ! -L AGENTS.md ] && [ -f AGENTS.md ] && [ "$(head -c 20 AGENTS.md)" = "CLAUDE.md" ]; then
+  rm -f AGENTS.md && ln -s CLAUDE.md AGENTS.md && ok "restored the AGENTS.md symlink"
+fi
+
+# --- 6. baseline commit -----------------------------------------------------
 # Committing now means the vault-setup skill's changes land as their own diff,
 # so you can see exactly what onboarding decided on your behalf.
 if [ -e .git ]; then
@@ -261,9 +287,10 @@ say "  1. Optional but recommended: drop a few real documents into '00 Inbox/'."
 say "     The onboarding skill reads them to propose your life areas, which"
 say "     beats inventing a folder taxonomy from a blank page."
 say ""
-say "  2. Open this folder in Claude Code and run:   /vault-setup"
-say "     Under Codex or another harness, say instead:"
-say "       read .claude/skills/vault-setup/SKILL.md and follow it"
+say "  2. Open this folder in your agent and ask for the vault-setup skill."
+say "     Claude Code:  /vault-setup"
+say "     Codex:        use the vault-setup skill"
+say "     Anything else: read .claude/skills/vault-setup/SKILL.md and follow it"
 say ""
 say "It will interview you briefly, write your schema into CLAUDE.md, create"
 say "your area folders, and commit. Then you are ready to ingest."
